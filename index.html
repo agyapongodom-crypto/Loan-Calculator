@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loan Calculator</title>
+
+<link rel="stylesheet" href="style.css">
+
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+
+<div class="container">
+<div class="layout">
+
+<!-- LEFT SIDE -->
+<div class="left">
+
+<h2>Loan Calculator</h2>
+<p class="note">The calculated amount is approximate.</p>
+
+<div class="board">
+
+<div class="card">
+<label>Loan Amount / Principal</label>
+<input type="number" id="principal">
+</div>
+
+<div class="card">
+<label>Tenure (months)</label>
+<input type="number" id="months">
+</div>
+
+<div class="card">
+<label>Interest Rate</label>
+
+Monthly
+<input type="number" id="monthlyRate" oninput="convertToAnnual()">
+
+Annual
+<input type="number" id="annualRate" oninput="convertToMonthly()">
+</div>
+
+</div>
+
+<!-- QUICK VIEW -->
+<div class="quick">
+<h3>Quick View</h3>
+
+<p>Principal: <span id="principalOutput">0</span></p>
+<p>Total Interest: <span id="totalInterest">0</span></p>
+<p>Total Payment: <span id="totalAmount">0</span></p>
+
+<button onclick="calculateLoan()">Calculate</button>
+</div>
+
+<!-- RESULTS -->
+<div class="results">
+
+<!-- CIRCLE -->
+<div>
+<div class="circle">
+<div class="inside">
+<p>Total</p>
+<h3 id="circleTotal">0</h3>
+</div>
+</div>
+
+<!-- LEGEND -->
+<div class="legend">
+<p><span class="green"></span> Principal</p>
+<p><span class="blue"></span> Interest</p>
+<p><span class="black"></span> Total Paid</p>
+</div>
+</div>
+
+<!-- SUMMARY -->
+<div class="summary">
+<h3>Summary</h3>
+
+<table>
+<tr><td>Loan Amount</td><td id="loanAmount">0</td></tr>
+<tr><td>Tenure</td><td id="loanTenure">0</td></tr>
+<tr><td>Interest Rate</td><td id="loanRate">0</td></tr>
+<tr><td>Total Interest</td><td id="loanInterest">0</td></tr>
+<tr><td>Total Repayment</td><td id="loanTotal">0</td></tr>
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- RIGHT SIDE -->
+<div class="right">
+
+<h3>Monthly Payment Table</h3>
+
+<table id="table">
+<thead>
+<tr>
+<th>Month</th>
+<th>Principal</th>
+<th>Interest</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<button onclick="exportToExcel()">Export CSV</button>
+<button onclick="generateStaffPDF()">Staff Copy</button>
+<button onclick="generateClientPDF()">Client Copy</button>
+
+</div>
+
+</div>
+</div>
+
+<script>
+
+let schedule=[];
+
+function format(v){
+return "GHS " + v.toFixed(2);
+}
+
+/* RATE CONVERSION */
+function convertToAnnual(){
+let m = document.getElementById("monthlyRate").value;
+if(m) document.getElementById("annualRate").value = (m * 12).toFixed(2);
+}
+
+function convertToMonthly(){
+let a = document.getElementById("annualRate").value;
+if(a) document.getElementById("monthlyRate").value = (a / 12).toFixed(2);
+}
+
+/* CALCULATION */
+function calculateLoan(){
+
+let p = parseFloat(document.getElementById("principal").value);
+let m = parseInt(document.getElementById("months").value);
+let r = parseFloat(document.getElementById("annualRate").value)/100;
+
+if(!p || !m || !r){
+alert("Please fill all fields");
+return;
+}
+
+let balance = p;
+let totalInterest = 0;
+
+schedule=[];
+let tbody = document.querySelector("#table tbody");
+tbody.innerHTML="";
+
+for(let i=1;i<=m;i++){
+
+let interest = balance * r / 12;
+let principalPay = p / m;
+
+balance -= principalPay;
+totalInterest += interest;
+
+schedule.push({
+month:i,
+principal:principalPay,
+interest:interest,
+payment:principalPay + interest
+});
+
+tbody.innerHTML += `
+<tr>
+<td>${i}</td>
+<td>${format(principalPay)}</td>
+<td>${format(interest)}</td>
+</tr>`;
+}
+
+let total = p + totalInterest;
+
+/* UPDATE UI */
+document.getElementById("principalOutput").innerText = format(p);
+document.getElementById("totalInterest").innerText = format(totalInterest);
+document.getElementById("totalAmount").innerText = format(total);
+
+document.getElementById("loanAmount").innerText = format(p);
+document.getElementById("loanTenure").innerText = m + " months";
+document.getElementById("loanRate").innerText = (r*100).toFixed(2) + "%";
+document.getElementById("loanInterest").innerText = format(totalInterest);
+document.getElementById("loanTotal").innerText = format(total);
+document.getElementById("circleTotal").innerText = format(total);
+
+/* CHART UPDATE */
+let pPerc = (p/total)*100;
+let iPerc = (totalInterest/total)*100;
+
+document.querySelector(".circle").style.background = `
+conic-gradient(
+#4ade14 0% ${pPerc}%,
+#2563eb ${pPerc}% ${pPerc+iPerc}%,
+#111 ${pPerc+iPerc}% 100%
+)`;
+
+}
+
+/* CSV */
+function exportToExcel(){
+
+let csv="Month,Principal,Interest\n";
+
+schedule.forEach(r=>{
+csv+=`${r.month},${r.principal.toFixed(2)},${r.interest.toFixed(2)}\n`;
+});
+
+let blob=new Blob([csv]);
+let a=document.createElement("a");
+
+a.href=URL.createObjectURL(blob);
+a.download="loan.csv";
+a.click();
+}
+
+/* STAFF PDF */
+function generateStaffPDF(){
+
+const { jsPDF } = window.jspdf;
+let doc = new jsPDF();
+
+let y=10;
+doc.text("Loan Schedule (Staff)",10,y);
+y+=10;
+
+schedule.forEach(r=>{
+
+if(y>280){doc.addPage(); y=10;}
+
+doc.text(
+`Month ${r.month} | Principal: ${format(r.principal)} | Interest: ${format(r.interest)}`,
+10,y
+);
+y+=10;
+});
+
+doc.save("Staff_Loan.pdf");
+}
+
+/* CLIENT PDF */
+function generateClientPDF(){
+
+const { jsPDF } = window.jspdf;
+let doc = new jsPDF();
+
+// GET VALUES
+let totalText = document.getElementById("loanTotal").innerText.replace("GHS ","");
+let monthsText = document.getElementById("loanTenure").innerText;
+
+let total = parseFloat(totalText);
+let months = parseInt(monthsText);
+
+// FIXED MONTHLY PAYMENT
+let monthlyPayment = total / months;
+
+let y = 10;
+
+doc.text("Loan Schedule (Client Copy)", 10, y);
+y += 10;
+
+doc.text(`Fixed Monthly Payment: GHS ${monthlyPayment.toFixed(2)}`, 10, y);
+y += 10;
+}
+
+</script>
+
+</body>
+</html>
+
+
