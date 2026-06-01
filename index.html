@@ -250,7 +250,13 @@ doc.save("Staff_Loan.pdf");
 }
 
 /* CLIENT PDF */
+
 function generateClientPDF(){
+
+if(schedule.length === 0){
+alert("Please calculate the loan first.");
+return;
+}
 
 const { jsPDF } = window.jspdf;
 let doc = new jsPDF();
@@ -259,21 +265,56 @@ let doc = new jsPDF();
 let totalText = document.getElementById("loanTotal").innerText.replace("GHS ","");
 let monthsText = document.getElementById("loanTenure").innerText;
 
-let total = parseFloat(totalText);
+let totalRepayment = parseFloat(totalText);
 let months = parseInt(monthsText);
 
-// FIXED MONTHLY PAYMENT
-let monthlyPayment = total / months;
-
-let y = 10;
-
-doc.text("Loan Schedule (Client Copy)", 10, y);
-y += 10;
-
-doc.text(`Fixed Monthly Payment: GHS ${monthlyPayment.toFixed(2)}`, 10, y);
-y += 10;
+if(isNaN(totalRepayment) || isNaN(months) || months <= 0){
+alert("Invalid loan data.");
+return;
 }
 
+// SAME PAYMENT EVERY MONTH
+let monthlyPayment = totalRepayment / months;
+
+let y = 15;
+
+doc.setFontSize(16);
+doc.text("Loan Schedule (Client Copy)", 10, y);
+
+y += 15;
+doc.setFontSize(12);
+doc.text(`Total Amount Payable: GHS ${totalRepayment.toFixed(2)}`, 10, y);
+
+y += 10;
+doc.text(`Tenure: ${months} Months`, 10, y);
+
+y += 10;
+doc.text(`Monthly Payment: GHS ${monthlyPayment.toFixed(2)}`, 10, y);
+
+y += 15;
+
+// TABLE HEADER
+doc.text("Month", 10, y);
+doc.text("Payment", 80, y);
+
+y += 8;
+
+// SAME PAYMENT FOR EVERY MONTH
+for(let i = 1; i <= months; i++){
+
+if(y > 280){
+doc.addPage();
+y = 10;
+}
+
+doc.text(i.toString(), 10, y);
+doc.text(`GHS ${monthlyPayment.toFixed(2)}`, 80, y);
+
+y += 8;
+}
+
+doc.save("Client_Loan.pdf");
+}
 </script>
 
 </body>
